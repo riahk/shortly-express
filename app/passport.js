@@ -22,7 +22,7 @@ module.exports = function(passport) {
     new User({username: username, password: password}).save().then(function(model)
       {
         console.log("sign up2");
-        done();
+        done(null, model);
       });
   }));
 

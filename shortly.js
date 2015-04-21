@@ -5,6 +5,7 @@ var bodyParser = require('body-parser');
 var session = require('express-session');
 var passport = require('passport');
 require('./app/passport.js')(passport);
+var flash = require('connect-flash');
 
 
 var db = require('./app/config');
@@ -21,6 +22,7 @@ var app = express();
 app.use(session({secret: 'cool'}));
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(flash());
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -51,14 +53,14 @@ app.get('/logout',
 
 app.get('/login',
 function(req, res) {
-  console.log("login");
   res.render('login');
+  // res.render('login', {login_errors: req.session.flash || [] });
 });
 
 app.post('/login', passport.authenticate('local-login',{
   successRedirect: "/",
   failureRedirect: "/login",
-  failureFlash: true
+  failureFlash: 'blah blah failed'
 }));
 
 var restrict = function(req, res, next) {
@@ -87,6 +89,7 @@ app.get('/links', restrict,
 function(req, res) {
   Links.reset().query({where:{user_id: req.user.id}}).fetch().then(function(links) {
     res.send(200, links.models);
+
   });
 });
 
@@ -154,6 +157,7 @@ app.get('/*', function(req, res) {
           .update({
             visits: link.get('visits') + 1,
           }).then(function() {
+            window.history.pushState(null, "test", link.get('code'));
             return res.redirect(link.get('url'));
           });
       });
