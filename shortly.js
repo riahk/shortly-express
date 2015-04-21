@@ -3,6 +3,8 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+var passport = require('passport');
+require('./app/passport.js')(passport);
 
 
 var db = require('./app/config');
@@ -13,9 +15,13 @@ var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 var User = require('./app/models/user');
 
+
 var app = express();
 
 app.use(session({secret: 'cool'}));
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 app.use(partials());
@@ -25,29 +31,16 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
-
 app.get('/signup',
 function(req, res) {
   res.render('signup');
 });
 
-app.post('/signup', function(req, res)
-{
-  console.log("post");
-  console.log(req.body);
-  var user = new User({
-    username : req.body.username,
-    password : req.body.password
-  });
-
-  user.save().then(function()
-  {
-    req.session.regenerate(function() {
-      req.session.user = user.get('id');
-      res.redirect(302, "/");
-    });
-  });
-});
+app.post('/signup', passport.authenticate('local-signup',{
+  successRedirect: "/",
+  failureRedirect: "/signup",
+  failureFlash: true
+}));
 
 app.get('/logout',
   function(req, res) {
@@ -62,30 +55,17 @@ function(req, res) {
   res.render('login');
 });
 
-app.post('/login', function(req, res) {
-  console.log('logging in................................');
-  console.log(req.body);
-  new User({username: req.body.username}).fetch()
-    .then(function(model) {
-      if(model && model.checkPassword(req.body.password)) {
-        console.log("got password");
-        req.session.regenerate(function() {
-          console.log("regenerated session");
-          req.session.user = model.get('id');
-          res.redirect(302, "/");
-        });
-      } else {
-        console.log("UNAUTHORIZED");
-        res.redirect(302, '/login');
-      }
-    })
-
-});
+app.post('/login', passport.authenticate('local-login',{
+  successRedirect: "/",
+  failureRedirect: "/login",
+  failureFlash: true
+}));
 
 var restrict = function(req, res, next) {
   console.log("redirect /");
   //check if logged in
-  if(req.session.user) {
+  if(req.isAuthenticated()) {
+    console.log("is authenticated");
     next();
   } else { res.redirect(302, '/login'); }
   //if logged in, next()
@@ -105,7 +85,7 @@ function(req, res) {
 
 app.get('/links', restrict,
 function(req, res) {
-  Links.reset().query({where:{user_id: req.session.user}}).fetch().then(function(links) {
+  Links.reset().query({where:{user_id: req.user.id}}).fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
@@ -113,7 +93,8 @@ function(req, res) {
 app.post('/links',
 function(req, res) {
   var uri = req.body.url;
-  var userId = req.session.user;
+  var userId = req.user.id;
+  console.log(req.user);
   if (!util.isValidUrl(uri)) {
     console.log('Not a valid url: ', uri);
     return res.send(404);
