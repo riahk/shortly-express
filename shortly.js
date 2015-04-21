@@ -43,7 +43,7 @@ app.post('/signup', function(req, res)
   user.save().then(function()
   {
     req.session.regenerate(function() {
-      req.session.user = user.get('username');
+      req.session.user = user.get('id');
       res.redirect(302, "/");
     });
   });
@@ -64,7 +64,7 @@ app.post('/login', function(req, res) {
         console.log("got password");
         req.session.regenerate(function() {
           console.log("regenerated session");
-          req.session.user = model.get('username');
+          req.session.user = model.get('id');
           res.redirect(302, "/");
         });
       } else {
@@ -75,7 +75,7 @@ app.post('/login', function(req, res) {
 
 });
 
-app.use('/', function(req, res) {
+var restrict = function(req, res, next) {
   console.log("redirect /");
   //check if logged in
   if(req.session.user) {
@@ -83,22 +83,22 @@ app.use('/', function(req, res) {
   } else { res.redirect(302, '/login'); }
   //if logged in, next()
   //else redirect to /login
-});
+}
 
 
-app.get('/',
+app.get('/', restrict,
 function(req, res) {
   res.render('index');
 });
 
-app.get('/create',
+app.get('/create', restrict,
 function(req, res) {
   res.render('index');
 });
 
-app.get('/links',
+app.get('/links', restrict,
 function(req, res) {
-  Links.reset().fetch().then(function(links) {
+  Links.reset().query({where:{user_id: req.session.user}}).fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
@@ -106,13 +106,13 @@ function(req, res) {
 app.post('/links',
 function(req, res) {
   var uri = req.body.url;
-
+  var userId = req.session.user;
   if (!util.isValidUrl(uri)) {
     console.log('Not a valid url: ', uri);
     return res.send(404);
   }
 
-  new Link({ url: uri }).fetch().then(function(found) {
+  new Link({ url: uri, user_id: userId }).fetch().then(function(found) {
     if (found) {
       res.send(200, found.attributes);
     } else {
@@ -125,7 +125,8 @@ function(req, res) {
         var link = new Link({
           url: uri,
           title: title,
-          base_url: req.headers.origin
+          base_url: req.headers.origin,
+          user_id : userId
         });
 
         link.save().then(function(newLink) {

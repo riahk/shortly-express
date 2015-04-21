@@ -316,6 +316,22 @@ describe('', function() {
       });
     });
 
+    it('Denies user with incorrect password', function(done) {
+      var options = {
+        'method': 'POST',
+        'uri': 'http://127.0.0.1:4568/login',
+        'json': {
+          'username': 'Phillip',
+          'password': 'Phillip2'
+        }
+      };
+
+      requestWithSession(options, function(error, res, body) {
+        expect(res.headers.location).to.equal('/login');
+        done();
+      });
+    });
+
     it('Users that do not exist are kept on login page', function(done) {
       var options = {
         'method': 'POST',
